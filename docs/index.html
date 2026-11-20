@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>axios-auth-kit · 无感刷新 + 加解密</title>
+  <script type="importmap">
+  { "imports": { "axios-auth-kit": "https://cdn.jsdelivr.net/npm/axios-auth-kit@1.0.0/dist/index.js" } }
+  </script>
+  <style>
+    :root { --bg:#f7f8fa; --card:#fff; --border:#e5e7eb; --text:#1f2329; --muted:#6b7280; --accent:#3b82f6; --green:#10b981; --code:#f3f4f6; }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; background:var(--bg); color:var(--text); padding:24px; }
+    .wrap { max-width:760px; margin:0 auto; }
+    h1 { font-size:22px; margin:0 0 4px; }
+    .sub { color:var(--muted); font-size:14px; margin-bottom:24px; }
+    .sub code { background:var(--code); padding:2px 6px; border-radius:4px; }
+    .card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:20px; margin-bottom:20px; }
+    .card h2 { font-size:16px; margin:0 0 12px; }
+    .row { display:flex; gap:12px; flex-wrap:wrap; align-items:center; margin-bottom:12px; }
+    input { padding:9px 12px; border:1px solid var(--border); border-radius:8px; font-size:14px; flex:1; min-width:200px; }
+    button { border:1px solid var(--border); background:#fff; color:var(--text); padding:8px 14px; border-radius:8px; cursor:pointer; font-size:13px; }
+    button.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+    button:hover { opacity:.9; }
+    .out { font-family:"SF Mono",Menlo,monospace; background:var(--code); padding:12px 14px; border-radius:8px; font-size:13px; line-height:1.8; word-break:break-all; }
+    .out b { color:var(--accent); }
+    pre { background:#0f172a; color:#d1d5db; border-radius:10px; padding:14px; font-size:12px; line-height:1.7; overflow-x:auto; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>axios-auth-kit</h1>
+    <p class="sub">无感刷新 + 请求去重 + 前端加解密。安装：<code>npm i axios-auth-kit</code></p>
+
+    <div class="card">
+      <h2>① AES 加解密（Web Crypto 实现）</h2>
+      <div class="row"><input id="plain" value="你好，这是要加密的敏感数据" /><button class="primary" onclick="doAes()">加密 → 解密</button></div>
+      <div class="out" id="aesOut"></div>
+    </div>
+
+    <div class="card">
+      <h2>② 无感刷新 + 请求去重 核心逻辑</h2>
+      <pre id="logic">
+// 无感刷新：响应 401 时自动刷新 token 并重放原请求，且并发去重（只刷一次）
+setupRefreshAuth(axios, {
+  isRefreshRequest: (config) => config.url === '/api/refresh',
+  refreshToken: async () => {
+    const { data } = await axios.post('/api/refresh')
+    return data.accessToken
+  },
+})
+
+// 请求去重：相同请求并发时只发一次，结果共享
+setupRequestDedupe(axios, { getKey: (config) => config.method + ' ' + config.url })
+      </pre>
+    </div>
+  </div>
+
+  <script type="module">
+    import { aesEncrypt, aesDecrypt } from 'axios-auth-kit'
+
+    window.doAes = async () => {
+      const plain = document.getElementById('plain').value
+      const password = 'demo-secret-key'
+      const out = document.getElementById('aesOut')
+      try {
+        const cipher = await aesEncrypt(plain, password)
+        const decrypted = await aesDecrypt(cipher, password)
+        out.innerHTML =
+          `<b>明文</b>：${plain}<br><b>密文</b>：${cipher.slice(0, 60)}…<br><b>解密</b>：${decrypted}<br>` +
+          `<span style="color:${decrypted === plain ? 'var(--green)' : 'var(--red)'}">${decrypted === plain ? '✓ 加解密一致' : '✗ 不一致'}</span>`
+      } catch (e) {
+        out.textContent = '错误：' + e.message
+      }
+    }
+  </script>
+</body>
+</html>
